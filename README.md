@@ -12,15 +12,24 @@
 
 ```
 line_webhook/
-├── app.py                 # Flask 主應用程式 (webhook endpoint)
-├── weather_service.py     # 天氣查詢服務
-├── requirements.txt       # Python 套件依賴
-├── pyproject.toml         # UV 專案配置
-├── Dockerfile             # Docker 映像檔設定
-├── docker-compose.yml     # Docker Compose 配置
-├── .env.example           # 環境變數範例
-├── .gitignore            # Git 忽略檔案
-└── note.md               # 專案筆記
+├── app.py                      # Flask 主應用程式 (webhook)
+├── weather_service.py          # 天氣查詢服務 (Flex Message)
+├── admin_app.py                # Rich Menu 管理後台 (port 5001)
+├── richmenu/                   # Rich Menu 相關檔案
+│   ├── generate_rich_menu_image.py  # 自動生成選單圖片
+│   ├── create_rich_menu.py          # 建立選單結構
+│   ├── rich_menu_alias.py           # Alias 管理
+│   ├── clean_richmenus.py           # 清理工具
+│   └── *.png                        # 選單圖片 (5個區域)
+├── templates/
+│   └── richmenu_manager.html   # 管理介面前端
+├── requirements.txt            # Python 套件依賴
+├── pyproject.toml              # UV 專案配置
+├── Dockerfile                  # Docker 映像檔設定
+├── docker-compose.yml          # Docker Compose 配置
+├── RICHMENU_GUIDE.md          # Rich Menu 架構說明
+├── .env.example                # 環境變數範例
+└── .gitignore                 # Git 忽略檔案
 ```
 
 ## 環境設定
@@ -71,18 +80,41 @@ docker-compose down
 
 ## API 端點
 
+### Webhook 服務 (port 5000)
 - `POST /callback` - LINE webhook endpoint
 - `GET /health` - 健康檢查
 
+### 管理後台 (port 5001)
+- `GET /` - Rich Menu 管理介面
+- `GET /api/richmenus` - 取得所有選單
+- `GET /api/richmenu/<id>/image` - 取得選單圖片
+- `GET /api/richmenu/default` - 取得預設選單
+- `POST /api/richmenu/default` - 設定預設選單
+- `DELETE /api/richmenu/<id>` - 刪除選單
+- `GET /api/aliases` - 取得所有別名
+
+啟動管理介面：
+```bash
+python admin_app.py
+# 訪問 http://localhost:5001
+```
+
 ## 使用範例
 
-在 LINE Bot 中輸入台灣縣市名稱即可查詢 36 小時天氣預報：
-- `台北` 或 `臺北` 或 `台北市`
-- `高雄`
-- `台中`
-- `新北`
+### 天氣查詢
+在 LINE Bot 中點選 Rich Menu 的城市按鈕，或直接輸入：
+- `天氣 台北市`
+- `天氣 高雄市`
+- `天氣 台中市`
+
+### Rich Menu
+- 點擊下方區域標籤（北部/中部/南部/東部/離島）自動切換城市列表
+- 點擊城市按鈕直接查詢該城市天氣
+- 使用管理介面查看、設定、刪除選單
 
 支援所有台灣縣市（共 22 個縣市）
+
+詳細的 Rich Menu 架構說明請參閱 [RICHMENU_GUIDE.md](RICHMENU_GUIDE.md)
 
 ## 注意事項
 

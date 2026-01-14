@@ -57,8 +57,9 @@ def callback():
 
 @handler.add(MessageEvent, message=TextMessageContent)
 def handle_message(event):
-    """處理文字訊息 - 支援 Flex Message"""
+    """處理文字訊息 - 天氣查詢 (地區切換已由 RichMenuSwitchAction 處理)"""
     user_message = event.message.text.strip()
+    user_id = event.source.user_id
 
     # 檢查是否以「天氣」開頭
     if not user_message.startswith("天氣"):
