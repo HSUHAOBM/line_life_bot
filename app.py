@@ -26,12 +26,21 @@ import json
 import traceback
 from datetime import datetime
 import logging
+import sys
 
 # 載入環境變數
 load_dotenv()
 
 app = Flask(__name__)
+stdout_handler = logging.StreamHandler(sys.stdout)
+stdout_handler.setLevel(logging.INFO)
+stdout_handler.setFormatter(logging.Formatter(
+    "%(asctime)s %(levelname)s [%(name)s] %(message)s"
+))
+app.logger.handlers.clear()
+app.logger.addHandler(stdout_handler)
 app.logger.setLevel(logging.INFO)
+app.logger.propagate = False
 
 # LINE Bot 設定
 configuration = Configuration(
