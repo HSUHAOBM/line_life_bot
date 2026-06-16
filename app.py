@@ -22,6 +22,8 @@ from weather_service import (
     normalize_city_name,
     format_supported_cities_list
 )
+import json
+import traceback
 
 # 載入環境變數
 load_dotenv()
@@ -37,20 +39,110 @@ handler = WebhookHandler(os.getenv('LINE_CHANNEL_SECRET'))
 @app.route("/callback", methods=['POST'])
 def callback():
     """LINE webhook callback endpoint"""
-    # 取得 X-Line-Signature header
-    signature = request.headers['X-Line-Signature']
 
-    # 取得請求 body
+    # 取得 X-Line-Signature header
+    signature = request.headers.get('X-Line-Signature', '')
+
+    # 取得請求 body，LINE 驗簽要用原始 body
     body = request.get_data(as_text=True)
-    app.logger.info("Request body: " + body)
+
+    # Cloudflare / Proxy / Flask 看到的 IP
+    cf_connecting_ip = request.headers.get("CF-Connecting-IP")
+    x_forwarded_for = request.headers.get("X-Forwarded-For")
+    x_real_ip = request.headers.get("X-Real-IP")
+    remote_addr = request.remote_addr
+
+    # 判斷最可能的真實來源 IP
+    # 如果有 Cloudflare，CF-Connecting-IP 通常就是 LINE 的來源 IP
+    client_ip = remote_addr
+
+    if x_real_ip:
+        client_ip = x_real_ip.strip()
+
+    if x_forwarded_for:
+        client_ip = x_forwarded_for.split(",")[0].strip()
+
+    if cf_connecting_ip:
+        client_ip = cf_connecting_ip.strip()
+
+    # 整理要記錄的資訊
+    log_data = {
+        "time": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+
+        # 最重要：來源 IP
+        "client_ip": client_ip,
+        "remote_addr": remote_addr,
+        "x_real_ip": x_real_ip,
+        "x_forwarded_for": x_forwarded_for,
+        "cf_connecting_ip": cf_connecting_ip,
+
+        # Cloudflare 資訊
+        "cf_ray": request.headers.get("CF-Ray"),
+        "cf_ipcountry": request.headers.get("CF-IPCountry"),
+        "cf_visitor": request.headers.get("CF-Visitor"),
+
+        # Request 基本資訊
+        "method": request.method,
+        "scheme": request.scheme,
+        "host": request.host,
+        "path": request.path,
+        "full_path": request.full_path,
+        "url": request.url,
+        "base_url": request.base_url,
+        "query_string": request.query_string.decode("utf-8", errors="replace"),
+
+        # Header 重點
+        "user_agent": request.headers.get("User-Agent"),
+        "content_type": request.headers.get("Content-Type"),
+        "content_length": request.headers.get("Content-Length"),
+        "x_line_signature_exists": bool(signature),
+        "x_line_signature": signature,
+
+        # Flask / WSGI 資訊
+        "access_route": list(request.access_route),
+        "server_protocol": request.environ.get("SERVER_PROTOCOL"),
+        "remote_port": request.environ.get("REMOTE_PORT"),
+
+        # 全部 headers
+        "headers": dict(request.headers),
+
+        # 原始 body
+        "body": body
+    }
+
+    app.logger.info(
+        "LINE Webhook Request Detail:\n%s",
+        json.dumps(log_data, ensure_ascii=False, indent=2)
+    )
 
     # 驗證請求來源
     try:
         handler.handle(body, signature)
+
     except InvalidSignatureError:
-        app.logger.info(
-            "Invalid signature. Please check your channel access token/channel secret.")
+        app.logger.warning(
+            "Invalid signature. client_ip=%s, cf_connecting_ip=%s, body=%s",
+            client_ip,
+            cf_connecting_ip,
+            body
+        )
         abort(400)
+
+    except Exception as ex:
+        app.logger.error(
+            "Webhook exception. client_ip=%s, error=%s, traceback=%s",
+            client_ip,
+            str(ex),
+            traceback.format_exc()
+        )
+        abort(500)
+
+    app.logger.info(
+        "LINE Webhook OK. client_ip=%s, cf_connecting_ip=%s, cf_ray=%s",
+        client_ip,
+        cf_connecting_ip,
+        request.headers.get("CF-Ray")
+    )
 
     return 'OK'
 
