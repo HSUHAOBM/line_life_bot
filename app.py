@@ -24,11 +24,14 @@ from weather_service import (
 )
 import json
 import traceback
+from datetime import datetime
+import logging
 
 # 載入環境變數
 load_dotenv()
 
 app = Flask(__name__)
+app.logger.setLevel(logging.INFO)
 
 # LINE Bot 設定
 configuration = Configuration(
